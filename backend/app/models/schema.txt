@@ -1,0 +1,66 @@
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 1. Users Table
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    pincode VARCHAR(10) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Appliances Table
+CREATE TABLE appliances (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    brand VARCHAR(50) NOT NULL,              -- e.g., 'LG', 'Samsung', 'Whirlpool'
+    model_number VARCHAR(100) NOT NULL,       -- e.g., 'FHM1007ZDW'
+    serial_number VARCHAR(100),
+    purchase_date DATE NOT NULL,
+    invoice_url VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Technicians Table (Seeded providers)
+CREATE TABLE technicians (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    brands_supported TEXT[] NOT NULL,         -- e.g., ARRAY['LG', 'Samsung']
+    service_pincodes TEXT[] NOT NULL,       -- e.g., ARRAY['560001', '560038']
+    rating NUMERIC(2, 1) DEFAULT 4.5,
+    base_inspection_fee NUMERIC(8, 2) NOT NULL,
+    is_available BOOLEAN DEFAULT TRUE
+);
+
+-- 4. Manual Chunks Table (RAG Knowledge Base)
+CREATE TABLE manual_chunks (
+    id SERIAL PRIMARY KEY,
+    brand VARCHAR(50) NOT NULL,
+    model_series VARCHAR(100) NOT NULL,
+    section_name VARCHAR(150) NOT NULL,
+    content TEXT NOT NULL,
+    embedding VECTOR(1536)                   -- Standard dimension for OpenAI / Gemini text embeddings
+);
+
+-- HNSW Index for rapid vector similarity searches
+CREATE INDEX idx_manual_chunks_embedding 
+ON manual_chunks 
+USING hnsw (embedding vector_cosine_ops);
+
+-- 5. Repair Tickets Table (Lifecycle Tracking)
+CREATE TABLE repair_tickets (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    appliance_id INT NOT NULL REFERENCES appliances(id) ON DELETE CASCADE,
+    symptoms_text TEXT NOT NULL,
+    diagnosis_summary JSONB,                 -- Structured breakdown of causes & actions
+    warranty_status VARCHAR(50),             -- 'COVERED', 'EXPIRED', 'NEEDS_VERIFICATION'
+    technician_id INT REFERENCES technicians(id) ON DELETE SET NULL,
+    booking_status VARCHAR(30) DEFAULT 'REPORTED', -- 'REPORTED', 'DIAGNOSED', 'BOOKED', 'COMPLETED'
+    scheduled_slot TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
