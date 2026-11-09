@@ -61,7 +61,7 @@ class ManualChunk(Base):
     model_series: Mapped[str] = mapped_column(String(100), nullable=False)
     section_name: Mapped[str] = mapped_column(String(150), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding = mapped_column(Vector(1536))
+    embedding = mapped_column(Vector(768))
 
 class RepairTicket(Base):
     __tablename__ = "repair_tickets"
